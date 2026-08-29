@@ -23,28 +23,30 @@ export default function DashboardLayout({
 }: DashboardLayoutProps) {
   const [collapsed, setCollapsed] = useState(collapsedSidebar);
 
+  const isUpload = variant === "upload";
+
   return (
     <div
-      className={`min-h-screen p-3 ${
-        variant === "upload" ? "veda-gradient-bg" : "veda-gradient-bg-alt"
+      className={`h-screen overflow-hidden p-3 ${
+        isUpload ? "veda-gradient-bg" : "veda-gradient-bg-alt"
       }`}
     >
-      <div className="flex gap-3 min-h-[calc(100vh-24px)]">
+      <div className="flex h-full gap-3">
         <Sidebar
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />
 
-        <div className="flex-1 flex flex-col min-w-0 gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 min-w-0">
           <Header
-            showBack={showBack || variant === "upload"}
+            showBack={showBack || isUpload}
             backHref={backHref}
           />
 
           <main
-            className={`flex-1 overflow-auto ${
-              fullBleed ? "" : "rounded-[40px]"
-            }`}
+            className={`min-h-0 flex-1 ${
+              isUpload ? "overflow-hidden" : "overflow-auto"
+            } ${fullBleed ? "" : "rounded-[40px]"}`}
           >
             {children}
           </main>

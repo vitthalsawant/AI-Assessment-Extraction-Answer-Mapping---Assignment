@@ -102,7 +102,7 @@ export default function UploadCard({
   return (
     <div className="flex-1 min-w-0">
       <div
-        className={`upload-dashed rounded-[20px] bg-white flex items-center justify-center min-h-[181px] relative ${
+        className={`upload-dashed rounded-[20px] bg-white flex items-center justify-center min-h-[168px] relative ${
           file ? "cursor-default" : "cursor-pointer"
         } ${dragOver && !file ? "drag-over" : ""}`}
         onDragOver={(e) => {
@@ -152,12 +152,12 @@ export default function UploadCard({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-4 py-6">
-            <div className="w-12 h-12 flex items-center justify-center bg-veda-bg-off-white rounded-lg">
-              <IconUpload size={32} className="text-veda-text" />
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="w-11 h-11 flex items-center justify-center bg-veda-bg-off-white rounded-lg">
+              <IconUpload size={28} className="text-veda-text" />
             </div>
             <div className="text-center">
-              <p className="text-xl font-semibold tracking-[-0.06em]">
+              <p className="text-lg font-semibold tracking-[-0.06em]">
                 <span className="text-veda-dark">Upload </span>
                 <span className="text-veda-orange">{label}</span>
               </p>

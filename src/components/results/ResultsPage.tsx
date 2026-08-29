@@ -67,7 +67,7 @@ export default function ResultsPage() {
         backHref="/"
         fullBleed
       >
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4">
+        <div className="flex h-full flex-col items-center justify-center gap-4 overflow-hidden bg-white px-6">
           <IconAlertTriangle size={48} className="text-veda-warning" />
           <p className="text-sm text-veda-text-muted text-center">{error}</p>
           <Link
@@ -92,8 +92,8 @@ export default function ResultsPage() {
       backHref="/"
       fullBleed
     >
-      <div className="p-3 min-h-full">
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 min-h-[calc(100vh-120px)]">
+      <div className="flex h-full flex-col p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-2">
           <QuestionList
             answers={session.mappedAnswers}
             selectedId={selectedId}

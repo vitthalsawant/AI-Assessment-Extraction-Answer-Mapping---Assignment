@@ -4,7 +4,7 @@ import SparkleLoader from "./SparkleLoader";
 
 export default function ProcessingOverlay() {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-white px-6 py-16">
+    <div className="flex h-full flex-col items-center justify-center overflow-hidden bg-white px-6">
       <div className="flex flex-col items-center gap-4">
         <SparkleLoader />
 

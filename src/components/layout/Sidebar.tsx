@@ -29,10 +29,9 @@ interface SidebarProps {
 export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   return (
     <aside
-      className={`hidden lg:flex flex-col shrink-0 veda-sidebar-shadow bg-white rounded-2xl transition-all duration-300 ${
+      className={`hidden lg:flex h-full flex-col shrink-0 veda-sidebar-shadow bg-white rounded-2xl transition-all duration-300 ${
         collapsed ? "w-16 p-3" : "w-[304px] p-6"
       }`}
-      style={{ minHeight: "calc(100vh - 24px)" }}
     >
       <div className="flex flex-col flex-1 gap-14">
         <div

@@ -28,6 +28,7 @@ export interface ExtractedAnswer {
   answerText: string;
   confidence: "high" | "medium" | "low";
   boundingBox?: BoundingBox;
+  pageNumber?: number;
   isUnreadable?: boolean;
 }
 
@@ -40,6 +41,8 @@ export interface MappedAnswer {
   status: "answered" | "unanswered" | "partial" | "unreadable";
   confidence?: "high" | "medium" | "low";
   boundingBox?: BoundingBox;
+  pageNumber?: number;
+  aiFeedback?: string;
 }
 
 export interface ExtractionSession {

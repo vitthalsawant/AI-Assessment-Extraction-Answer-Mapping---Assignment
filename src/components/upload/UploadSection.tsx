@@ -55,11 +55,11 @@ export default function UploadSection() {
       {isProcessing ? (
         <ProcessingOverlay />
       ) : (
-        <div className="flex flex-col items-center justify-center min-h-full px-4 py-10 lg:py-16">
-          <div className="flex flex-col items-center gap-5 max-w-[789px] w-full">
+        <div className="flex h-full flex-col items-center justify-center overflow-hidden px-4">
+          <div className="flex w-full max-w-[789px] flex-col items-center gap-3">
             {/* Title */}
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <span className="text-[40px] font-bold leading-[48px] tracking-[-0.04em] text-veda-dark">
                   Upload
                 </span>
@@ -67,17 +67,19 @@ export default function UploadSection() {
                   Question Paper & Answer Sheets
                 </span>
               </div>
-              <p className="text-xl tracking-[-0.04em] text-veda-text">
+              <p className="text-xl leading-7 tracking-[-0.04em] text-veda-text">
                 Upload both files to get started
               </p>
             </div>
 
             {/* Teacher illustration */}
-            <TeacherIllustration />
+            <div className="shrink-0">
+              <TeacherIllustration />
+            </div>
 
             {/* Upload cards container */}
-            <div className="w-full bg-white/50 rounded-3xl p-3">
-              <div className="flex flex-col sm:flex-row gap-4">
+            <div className="w-full shrink-0 rounded-3xl bg-white/50 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <UploadCard
                   label="Question Paper"
                   file={questionPaper}
@@ -98,7 +100,7 @@ export default function UploadSection() {
             )}
 
             {/* CTA */}
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex shrink-0 flex-col items-center gap-2">
               <button
                 onClick={handleSubmit}
                 disabled={!canSubmit}

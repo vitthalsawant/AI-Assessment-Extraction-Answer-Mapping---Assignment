@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconChevronDownSmall, IconChevronUp } from "@/components/icons/VedaIcons";
+import { buildFeedback } from "@/lib/feedback";
 import { MappedAnswer } from "@/lib/types";
 
 interface QuestionListProps {
@@ -37,11 +38,15 @@ function ScorePill({ text, variant }: { text: string; variant: "success" | "dang
   };
   return (
     <span
-      className={`px-3 py-1 rounded-full text-base font-bold tracking-[-0.04em] ${styles[variant]}`}
+      className={`rounded-full px-3 py-1 text-base font-bold tracking-[-0.04em] ${styles[variant]}`}
     >
       {text}
     </span>
   );
+}
+
+function getFeedbackText(answer: MappedAnswer): string {
+  return answer.aiFeedback || buildFeedback(answer);
 }
 
 export default function QuestionList({
@@ -50,6 +55,20 @@ export default function QuestionList({
   onSelect,
 }: QuestionListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    if (!selectedId) return;
+
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.add(selectedId);
+      return next;
+    });
+
+    const card = cardRefs.current.get(selectedId);
+    card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedId]);
 
   const toggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -62,76 +81,93 @@ export default function QuestionList({
   };
 
   const expandAll = () => {
-    setExpandedIds(new Set(answers.map((a) => a.questionId)));
+    setExpandedIds(new Set(answers.map((answer) => answer.questionId)));
+  };
+
+  const handleSelect = (id: string) => {
+    onSelect(id);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
 
   return (
-    <div className="flex flex-col h-full bg-white/50 rounded-[20px] p-4 gap-4">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col gap-4 rounded-[20px] bg-white/50 p-4">
+      <div className="flex shrink-0 items-center justify-between">
         <h2 className="text-base font-bold tracking-[-0.04em] text-veda-text">
           Extracted Questions (from question paper)
         </h2>
         <button
+          type="button"
           onClick={expandAll}
-          className="px-4 py-3 bg-white rounded-full text-sm font-medium tracking-[-0.04em] text-[#181818] hover:bg-veda-bg-off-white transition-colors"
+          className="rounded-full bg-white px-4 py-3 text-sm font-medium tracking-[-0.04em] text-[#181818] transition-colors hover:bg-veda-bg-off-white"
         >
           Expand All
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto flex flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {answers.map((answer) => {
           const isSelected = selectedId === answer.questionId;
           const isExpanded = expandedIds.has(answer.questionId);
+          const showFeedback = isExpanded || isSelected;
           const score = getScoreDisplay(answer);
           const hasSubLabel = answer.subQuestionLabel;
 
           return (
-            <div key={answer.questionId}>
+            <div
+              key={answer.questionId}
+              ref={(node) => {
+                if (node) cardRefs.current.set(answer.questionId, node);
+                else cardRefs.current.delete(answer.questionId);
+              }}
+            >
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => onSelect(answer.questionId)}
+                onClick={() => handleSelect(answer.questionId)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    onSelect(answer.questionId);
+                    handleSelect(answer.questionId);
                   }
                 }}
-                className={`w-full text-left bg-white rounded-2xl p-3 transition-all cursor-pointer ${
+                className={`w-full cursor-pointer rounded-2xl bg-white p-3 text-left transition-all ${
                   isSelected
                     ? "border-2 border-[#FF8D36]"
                     : "border-2 border-transparent"
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex shrink-0 items-center gap-2">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-extrabold text-xl tracking-[-0.04em] border-2 border-white/25 shadow-sm ${
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/25 text-xl font-extrabold tracking-[-0.04em] text-white shadow-sm ${
                         isSelected ? "bg-veda-orange" : "bg-[rgba(43,43,43,0.8)]"
                       }`}
                     >
                       {answer.questionNumber.replace(/\(.*\)/, "")}
                     </div>
                     {hasSubLabel && (
-                      <div className="w-8 h-8 rounded-full bg-veda-bg-off-white flex items-center justify-center text-base font-bold text-veda-text">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-veda-bg-off-white text-base font-bold text-veda-text">
                         {answer.subQuestionLabel}.
                       </div>
                     )}
                   </div>
 
-                  <p className="flex-1 text-base tracking-[-0.04em] text-veda-text leading-[22px]">
+                  <p className="flex-1 text-base leading-[22px] tracking-[-0.04em] text-veda-text">
                     {answer.questionText}
                   </p>
 
-                  <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex shrink-0 items-center gap-4">
                     <ScorePill text={score.text} variant={score.variant} />
                     <button
                       type="button"
                       onClick={(e) => toggleExpand(answer.questionId, e)}
                       aria-expanded={isExpanded}
                       aria-label={isExpanded ? "Collapse question" : "Expand question"}
-                      className="w-7 h-7 flex items-center justify-center bg-veda-bg-off-white rounded-lg"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-veda-bg-off-white"
                     >
                       {isExpanded ? (
                         <IconChevronUp size={20} className="text-[#1E1E1E]" />
@@ -143,17 +179,13 @@ export default function QuestionList({
                 </div>
               </div>
 
-              {isExpanded && answer.answerText && (
-                <div className="mt-2 mx-1 bg-veda-bg-off-white rounded-2xl px-6 py-4">
-                  <p className="text-base font-bold tracking-[-0.04em] text-veda-text mb-2.5">
+              {showFeedback && (
+                <div className="mx-1 mt-2 rounded-2xl bg-veda-bg-off-white px-6 py-4">
+                  <p className="mb-2.5 text-base font-bold tracking-[-0.04em] text-veda-text">
                     AI Feedback
                   </p>
-                  <p className="text-sm tracking-[-0.04em] text-veda-text leading-5">
-                    {answer.status === "answered"
-                      ? `Answer extracted: "${answer.answerText.slice(0, 200)}${answer.answerText.length > 200 ? "..." : ""}"`
-                      : answer.status === "unreadable"
-                        ? "The answer was detected but may be difficult to read. Manual review recommended."
-                        : "No answer was detected for this question."}
+                  <p className="text-sm leading-5 tracking-[-0.04em] text-veda-text">
+                    {getFeedbackText(answer)}
                   </p>
                 </div>
               )}

@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { buildFeedback } from "./feedback";
 import {
   ExtractedAnswer,
   ExtractedQuestion,
@@ -40,6 +41,7 @@ Rules:
 4. If handwriting is illegible, set isUnreadable to true and provide best guess in answerText
 5. For each answer, estimate bounding box location as percentages of image dimensions (0-100)
 6. Set confidence: high (clear text), medium (partially clear), low (hard to read)
+7. Include pageNumber (1-based) indicating which page of the answer sheet the answer appears on
 
 Return ONLY valid JSON in this exact format (no markdown, no code fences):
 {
@@ -50,6 +52,7 @@ Return ONLY valid JSON in this exact format (no markdown, no code fences):
       "answerText": "The student's answer text",
       "confidence": "high",
       "boundingBox": { "x": 10, "y": 20, "width": 80, "height": 15 },
+      "pageNumber": 1,
       "isUnreadable": false
     },
     {
@@ -58,6 +61,7 @@ Return ONLY valid JSON in this exact format (no markdown, no code fences):
       "answerText": "Answer for sub-question 2a",
       "confidence": "medium",
       "boundingBox": { "x": 10, "y": 40, "width": 80, "height": 10 },
+      "pageNumber": 1,
       "isUnreadable": false
     }
   ]
@@ -180,6 +184,45 @@ async function callGeminiWithFile(
   throw new Error(formatGeminiError(lastError));
 }
 
+async function callGeminiText(prompt: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY is not configured. Add it to your environment variables."
+    );
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const models = getModelCandidates();
+  let lastError: unknown;
+
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 8192,
+        },
+      });
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      if (!text) {
+        throw new Error("Gemini returned an empty response.");
+      }
+      return text;
+    } catch (error) {
+      lastError = error;
+      if (!isModelNotFoundError(error)) {
+        throw new Error(formatGeminiError(error));
+      }
+    }
+  }
+
+  throw new Error(formatGeminiError(lastError));
+}
+
 export async function extractQuestions(
   mimeType: string,
   base64Data: string
@@ -224,6 +267,7 @@ export async function extractAnswers(
     subQuestionLabel: a.subQuestionLabel
       ? a.subQuestionLabel.toLowerCase()
       : undefined,
+    pageNumber: a.pageNumber && a.pageNumber > 0 ? a.pageNumber : 1,
   }));
 }
 
@@ -246,14 +290,14 @@ export function mapAnswersToQuestions(
     answerMap.set(key, answer);
   }
 
-  const mapped: MappedAnswer[] = [];
+  const mappedAnswers: MappedAnswer[] = [];
 
   for (const question of questions) {
     if (question.subQuestions && question.subQuestions.length > 0) {
       for (const sub of question.subQuestions) {
         const key = `${question.number}:${sub.label.toLowerCase()}`;
         const answer = answerMap.get(key);
-        mapped.push(createMappedAnswer(question, sub.text, sub.label, answer));
+        mappedAnswers.push(createMappedAnswer(question, sub.text, sub.label, answer));
       }
     } else {
       const key = `${question.number}:`;
@@ -261,11 +305,98 @@ export function mapAnswersToQuestions(
         answerMap.get(key) ||
         answerMap.get(`${question.number}:null`) ||
         findFuzzyAnswer(answerMap, question.number);
-      mapped.push(createMappedAnswer(question, question.text, undefined, answer));
+      mappedAnswers.push(createMappedAnswer(question, question.text, undefined, answer));
     }
   }
 
-  return mapped;
+  return mappedAnswers.map((answer, index, all) =>
+    enrichMappedAnswer(answer, index, all)
+  );
+}
+
+function enrichMappedAnswer(
+  answer: MappedAnswer,
+  index: number,
+  all: MappedAnswer[]
+): MappedAnswer {
+  const enriched = { ...answer };
+
+  if (!enriched.pageNumber) {
+    enriched.pageNumber = 1;
+  }
+
+  if (!enriched.boundingBox && enriched.status !== "unanswered") {
+    const answeredBefore = all
+      .slice(0, index)
+      .filter((item) => item.status !== "unanswered").length;
+    const answeredTotal = all.filter(
+      (item) => item.status !== "unanswered"
+    ).length;
+    const slotHeight = Math.min(72 / Math.max(answeredTotal, 1), 16);
+    enriched.boundingBox = {
+      x: 5,
+      y: 6 + answeredBefore * (slotHeight + 3),
+      width: 90,
+      height: slotHeight,
+    };
+  }
+
+  return enriched;
+}
+
+export async function generateAiFeedback(
+  mappedAnswers: MappedAnswer[]
+): Promise<MappedAnswer[]> {
+  if (mappedAnswers.length === 0) return mappedAnswers;
+
+  const payload = mappedAnswers.map((answer) => ({
+    questionId: answer.questionId,
+    question: answer.questionText,
+    answer: answer.answerText,
+    status: answer.status,
+    confidence: answer.confidence,
+  }));
+
+  const prompt = `You are an experienced teacher reviewing student exam answers. For each item below, write 1-2 sentences of warm, constructive feedback specific to that question and answer.
+
+Guidelines:
+- Praise correct, clear answers enthusiastically
+- For missing answers, encourage attempting the question
+- For partial or unclear answers, suggest what to improve
+- Reference the actual answer content when available
+- Do NOT repeat the question text verbatim
+
+Return ONLY valid JSON (no markdown):
+{
+  "items": [
+    { "questionId": "q1", "feedback": "Excellent work! ..." }
+  ]
+}
+
+Items:
+${JSON.stringify(payload)}`;
+
+  try {
+    const text = await callGeminiText(prompt);
+    const parsed = parseJsonResponse<{
+      items: { questionId: string; feedback: string }[];
+    }>(text);
+
+    const feedbackMap = new Map(
+      (parsed.items || []).map((item) => [item.questionId, item.feedback])
+    );
+
+    return mappedAnswers.map((answer) => ({
+      ...answer,
+      aiFeedback:
+        feedbackMap.get(answer.questionId)?.trim() || buildFeedback(answer),
+    }));
+  } catch {
+    return mappedAnswers.map((answer) => ({
+      ...answer,
+      aiFeedback: buildFeedback(answer),
+    }));
+  }
 }
 
 function findFuzzyAnswer(
@@ -294,6 +425,7 @@ function createMappedAnswer(
       subQuestionLabel: subLabel,
       answerText: null,
       status: "unanswered",
+      pageNumber: answer?.pageNumber,
     };
   }
 
@@ -307,6 +439,7 @@ function createMappedAnswer(
       status: "unreadable",
       confidence: answer.confidence,
       boundingBox: answer.boundingBox,
+      pageNumber: answer.pageNumber,
     };
   }
 
@@ -319,6 +452,7 @@ function createMappedAnswer(
     status: "answered",
     confidence: answer.confidence,
     boundingBox: answer.boundingBox,
+    pageNumber: answer.pageNumber,
   };
 }
 

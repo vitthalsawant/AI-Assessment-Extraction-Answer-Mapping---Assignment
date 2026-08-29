@@ -5,6 +5,7 @@ import {
   extractAnswers,
   mapAnswersToQuestions,
   computeStats,
+  generateAiFeedback,
 } from "@/lib/gemini";
 import { saveSession, updateSession } from "@/lib/storage";
 import { validateFile, getMimeType } from "@/lib/validation";
@@ -82,12 +83,13 @@ export async function POST(request: NextRequest) {
       }
 
       const mappedAnswers = mapAnswersToQuestions(questions, answers);
-      const stats = computeStats(mappedAnswers);
+      const mappedWithFeedback = await generateAiFeedback(mappedAnswers);
+      const stats = computeStats(mappedWithFeedback);
 
       const completed = updateSession(sessionId, {
         status: "completed",
         questions,
-        mappedAnswers,
+        mappedAnswers: mappedWithFeedback,
         stats,
       });
 
