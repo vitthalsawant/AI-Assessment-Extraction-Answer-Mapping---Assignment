@@ -8,12 +8,16 @@ import {
   IconPlus,
 } from "@/components/icons/VedaIcons";
 import { MappedAnswer } from "@/lib/types";
+import { getHighlightBoundingBox } from "@/lib/bounding-box";
+import AnswerHighlight from "./AnswerHighlight";
+import PdfSheetCanvas from "./PdfSheetCanvas";
 
 interface AnswerSheetViewerProps {
   imageSrc: string;
   mimeType: string;
   answers: MappedAnswer[];
   selectedId: string | null;
+  isRefining?: boolean;
 }
 
 export default function AnswerSheetViewer({
@@ -21,84 +25,91 @@ export default function AnswerSheetViewer({
   mimeType,
   answers,
   selectedId,
+  isRefining = false,
 }: AnswerSheetViewerProps) {
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [pdfPages, setPdfPages] = useState(1);
+  const [sheetReady, setSheetReady] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const imageWrapRef = useRef<HTMLDivElement>(null);
-  const highlightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const highlightRef = useRef<HTMLDivElement>(null);
   const isPdf = mimeType === "application/pdf";
 
-  const totalPages = useMemo(() => {
-    const maxPage = answers.reduce(
-      (max, answer) => Math.max(max, answer.pageNumber ?? 1),
-      1
-    );
-    return Math.max(maxPage, 1);
-  }, [answers]);
-
-  const pageAnswers = useMemo(
-    () => answers.filter((answer) => (answer.pageNumber ?? 1) === page),
-    [answers, page]
+  const selectedAnswer = useMemo(
+    () => answers.find((item) => item.questionId === selectedId) ?? null,
+    [answers, selectedId]
   );
 
-  const scrollToHighlight = useCallback(
-    (questionId: string | null) => {
-      if (!questionId || !scrollRef.current) return;
+  const highlight = useMemo(() => {
+    const result = getHighlightBoundingBox(answers, selectedId, {
+      allowEstimate: true,
+    });
 
-      const highlight = highlightRefs.current.get(questionId);
-      if (!highlight) return;
+    if (result && !result.estimated) return result;
+    if (isRefining) return null;
+    return result;
+  }, [answers, selectedId, isRefining]);
 
-      const container = scrollRef.current;
-      const containerRect = container.getBoundingClientRect();
-      const highlightRect = highlight.getBoundingClientRect();
+  const activePage = isPdf
+    ? (highlight?.answer.pageNumber ?? selectedAnswer?.pageNumber ?? page)
+    : 1;
 
-      const deltaY =
-        highlightRect.top -
-        containerRect.top -
+  const showHighlightOnPage =
+    !isPdf || !highlight || (highlight.answer.pageNumber ?? 1) === activePage;
+
+  const scrollToHighlight = useCallback(() => {
+    if (!scrollRef.current || !highlightRef.current) return;
+
+    const container = scrollRef.current;
+    const target = highlightRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+
+    container.scrollTo({
+      top:
+        container.scrollTop +
+        (targetRect.top - containerRect.top) -
         container.clientHeight / 2 +
-        highlightRect.height / 2 +
-        14;
-      const deltaX =
-        highlightRect.left -
-        containerRect.left -
+        targetRect.height / 2,
+      left:
+        container.scrollLeft +
+        (targetRect.left - containerRect.left) -
         container.clientWidth / 2 +
-        highlightRect.width / 2;
-
-      container.scrollTo({
-        top: container.scrollTop + deltaY,
-        left: container.scrollLeft + deltaX,
-        behavior: "smooth",
-      });
-    },
-    []
-  );
+        targetRect.width / 2,
+      behavior: "smooth",
+    });
+  }, []);
 
   useEffect(() => {
-    if (!selectedId) return;
-
-    const answer = answers.find((item) => item.questionId === selectedId);
-    if (answer?.pageNumber && answer.pageNumber !== page) {
-      setPage(answer.pageNumber);
-      return;
+    if (isPdf && selectedAnswer?.pageNumber) {
+      setPage(selectedAnswer.pageNumber);
     }
-
-    if (imageLoaded) {
-      const timer = window.setTimeout(() => scrollToHighlight(selectedId), 80);
-      return () => window.clearTimeout(timer);
-    }
-  }, [selectedId, answers, page, imageLoaded, scrollToHighlight]);
+  }, [isPdf, selectedAnswer?.pageNumber, selectedId]);
 
   useEffect(() => {
-    if (imageLoaded && selectedId) {
-      const timer = window.setTimeout(() => scrollToHighlight(selectedId), 120);
-      return () => window.clearTimeout(timer);
-    }
-  }, [page, imageLoaded, selectedId, scrollToHighlight]);
+    setSheetReady(false);
+  }, [imageSrc, isPdf, activePage]);
+
+  useEffect(() => {
+    if (!highlight || !sheetReady || isRefining || !showHighlightOnPage) return;
+    const timer = window.setTimeout(scrollToHighlight, 120);
+    return () => window.clearTimeout(timer);
+  }, [
+    highlight,
+    sheetReady,
+    isRefining,
+    zoom,
+    showHighlightOnPage,
+    scrollToHighlight,
+  ]);
 
   const handleZoomIn = () => setZoom((value) => Math.min(value + 25, 200));
   const handleZoomOut = () => setZoom((value) => Math.max(value - 25, 50));
+
+  const label =
+    highlight?.answer.questionNumber.replace(/\(.*\)/, "") ?? "";
+
+  const totalPages = isPdf ? pdfPages : 1;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-black/10 bg-white">
@@ -130,95 +141,88 @@ export default function AnswerSheetViewer({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={page === 1}
-              className="text-white/60 disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <IconChevronLeft size={16} className="text-white/60" />
-            </button>
-            <span className="text-sm font-bold tracking-[-0.04em] text-white">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() =>
-                setPage((current) => Math.min(totalPages, current + 1))
-              }
-              disabled={page === totalPages}
-              className="text-white disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <IconChevronRight size={16} className="text-white" />
-            </button>
-          </div>
+          {isPdf && totalPages > 1 && (
+            <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={activePage === 1}
+                className="text-white/60 disabled:opacity-40"
+                aria-label="Previous page"
+              >
+                <IconChevronLeft size={16} className="text-white/60" />
+              </button>
+              <span className="text-sm font-bold tracking-[-0.04em] text-white">
+                Page {activePage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
+                disabled={activePage === totalPages}
+                className="text-white disabled:opacity-40"
+                aria-label="Next page"
+              >
+                <IconChevronRight size={16} className="text-white" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-auto bg-[#f8f8f8] scroll-smooth"
+        className="relative min-h-0 flex-1 overflow-auto bg-[#f8f8f8] scroll-smooth"
       >
         <div
-          className="mx-auto p-4 pt-8 transition-[width] duration-200"
+          className="mx-auto p-4 transition-[width] duration-200"
           style={{ width: `${zoom}%` }}
         >
-          {isPdf ? (
-            <iframe
-              src={imageSrc}
-              className="h-[700px] w-full bg-white"
-              title="Answer Sheet PDF"
-            />
-          ) : (
-            <div ref={imageWrapRef} className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+          <div className="relative">
+            {isPdf ? (
+              <PdfSheetCanvas
                 src={imageSrc}
-                alt="Answer Sheet"
-                className="block w-full select-none"
-                onLoad={() => setImageLoaded(true)}
+                page={activePage}
+                onDocumentLoad={setPdfPages}
+                onRender={() => setSheetReady(true)}
               />
+            ) : (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageSrc}
+                  alt="Answer Sheet"
+                  className="block w-full select-none"
+                  onLoad={() => setSheetReady(true)}
+                />
+              </>
+            )}
 
-              {pageAnswers.map((answer) => {
-                if (!answer.boundingBox || answer.questionId !== selectedId) {
-                  return null;
-                }
-
-                const { x, y, width, height } = answer.boundingBox;
-                const label = answer.questionNumber.replace(/\(.*\)/, "");
-
-                return (
-                  <div
-                    key={answer.questionId}
-                    ref={(node) => {
-                      if (node) {
-                        highlightRefs.current.set(answer.questionId, node);
-                      } else {
-                        highlightRefs.current.delete(answer.questionId);
-                      }
-                    }}
-                    data-question-id={answer.questionId}
-                    className="pointer-events-none absolute z-20 rounded-2xl border-2 border-[#3DD218] bg-[rgba(94,255,53,0.1)]"
-                    style={{
-                      left: `${x}%`,
-                      top: `${y}%`,
-                      width: `${width}%`,
-                      height: `${height}%`,
-                      boxShadow: "0 0 0 1px rgba(61, 210, 24, 0.2)",
-                    }}
-                  >
-                    <span className="absolute left-3.5 -top-[27px] rounded-t-xl bg-[#3DD218] px-3 py-1 text-base font-bold tracking-[-0.04em] text-white underline decoration-white underline-offset-[3px]">
-                      Q{label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+            {highlight && showHighlightOnPage && (
+              <div
+                ref={highlightRef}
+                className="absolute z-20"
+                style={{
+                  left: `${highlight.box.x}%`,
+                  top: `${highlight.box.y}%`,
+                  width: `${highlight.box.width}%`,
+                  height: `${highlight.box.height}%`,
+                }}
+              >
+                <AnswerHighlight label={label} />
+              </div>
+            )}
+          </div>
         </div>
+
+        {isRefining && (
+          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+            <span className="rounded-full bg-veda-text/90 px-4 py-1.5 text-xs font-medium text-white">
+              Locating answer...
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

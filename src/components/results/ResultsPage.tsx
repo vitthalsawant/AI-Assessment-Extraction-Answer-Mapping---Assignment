@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import QuestionList from "@/components/results/QuestionList";
 import AnswerSheetViewer from "@/components/results/AnswerSheetViewer";
 import ProcessingOverlay from "@/components/upload/ProcessingOverlay";
-import { ExtractionSession } from "@/lib/types";
+import {
+  estimateAnswerBoundingBox,
+  isDisplayableBoundingBox,
+  pickBetterBoundingBox,
+} from "@/lib/bounding-box";
+import { ExtractionSession, MappedAnswer } from "@/lib/types";
 import { IconAlertTriangle, IconArrowLeft } from "@/components/icons/VedaIcons";
 import Link from "next/link";
 
@@ -14,9 +19,12 @@ export default function ResultsPage() {
   const params = useParams();
   const sessionId = params.id as string;
   const [session, setSession] = useState<ExtractionSession | null>(null);
+  const [mappedAnswers, setMappedAnswers] = useState<MappedAnswer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [refiningId, setRefiningId] = useState<string | null>(null);
+  const refinedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchSession() {
@@ -29,6 +37,7 @@ export default function ResultsPage() {
         }
 
         setSession(data);
+        setMappedAnswers(data.mappedAnswers || []);
         if (data.mappedAnswers?.length > 0) {
           setSelectedId(data.mappedAnswers[0].questionId);
         }
@@ -43,6 +52,84 @@ export default function ResultsPage() {
 
     if (sessionId) fetchSession();
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!selectedId || !sessionId) return;
+
+    const answer = mappedAnswers.find((item) => item.questionId === selectedId);
+    if (!answer || answer.status === "unanswered") return;
+
+    if (isDisplayableBoundingBox(answer.boundingBox)) {
+      refinedIdsRef.current.add(selectedId);
+      return;
+    }
+
+    if (refinedIdsRef.current.has(selectedId)) return;
+
+    let cancelled = false;
+
+    async function refineRegion() {
+      if (!selectedId) return;
+      setRefiningId(selectedId);
+
+      try {
+        const res = await fetch(`/api/session/${sessionId}/refine-region`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ questionId: selectedId }),
+        });
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        refinedIdsRef.current.add(selectedId);
+
+        setMappedAnswers((prev) => {
+          const current = prev.find((item) => item.questionId === selectedId);
+          if (!current) return prev;
+
+          const refinedBox =
+            res.ok && data.boundingBox ? data.boundingBox : undefined;
+          const betterBox = pickBetterBoundingBox(
+            current.boundingBox,
+            refinedBox
+          );
+
+          if (betterBox) {
+            return prev.map((item) =>
+              item.questionId === selectedId
+                ? {
+                    ...item,
+                    boundingBox: betterBox,
+                    pageNumber:
+                      data.pageNumber ?? item.pageNumber ?? item.pageNumber ?? 1,
+                  }
+                : item
+            );
+          }
+
+          if (isDisplayableBoundingBox(current.boundingBox)) return prev;
+
+          const fallback = estimateAnswerBoundingBox(prev, selectedId);
+          if (!fallback) return prev;
+
+          return prev.map((item) =>
+            item.questionId === selectedId
+              ? { ...item, boundingBox: fallback, pageNumber: 1 }
+              : item
+          );
+        });
+      } finally {
+        if (!cancelled) setRefiningId(null);
+      }
+    }
+
+    refineRegion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, sessionId, mappedAnswers.length]);
 
   if (loading) {
     return (
@@ -83,6 +170,12 @@ export default function ResultsPage() {
   }
 
   const imageSrc = `data:${session.answerSheetMime};base64,${session.answerSheetBase64}`;
+  const selectedAnswer = mappedAnswers.find(
+    (item) => item.questionId === selectedId
+  );
+  const isRefiningSelected =
+    refiningId === selectedId &&
+    !isDisplayableBoundingBox(selectedAnswer?.boundingBox);
 
   return (
     <DashboardLayout
@@ -95,15 +188,16 @@ export default function ResultsPage() {
       <div className="flex h-full flex-col p-3">
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-2">
           <QuestionList
-            answers={session.mappedAnswers}
+            answers={mappedAnswers}
             selectedId={selectedId}
             onSelect={setSelectedId}
           />
           <AnswerSheetViewer
             imageSrc={imageSrc}
             mimeType={session.answerSheetMime}
-            answers={session.mappedAnswers}
+            answers={mappedAnswers}
             selectedId={selectedId}
+            isRefining={isRefiningSelected}
           />
         </div>
       </div>

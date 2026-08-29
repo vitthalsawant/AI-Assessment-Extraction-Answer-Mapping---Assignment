@@ -1,9 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  clampBoundingBox,
+  isValidBoundingBox,
+  normalizeBoundingBox,
+  padBoundingBox,
+} from "./bounding-box";
 import { buildFeedback } from "./feedback";
 import {
   ExtractedAnswer,
   ExtractedQuestion,
   MappedAnswer,
+  BoundingBox,
 } from "./types";
 
 const QUESTION_EXTRACTION_PROMPT = `You are an expert at reading exam question papers. Analyze the uploaded question paper image/PDF and extract ALL questions in structured JSON format.
@@ -39,7 +46,10 @@ Rules:
 2. Match each answer to its question number (e.g., "1", "2", "3a", "3b", "Q4")
 3. Normalize question numbers to match standard format (remove "Q" prefix, use lowercase for sub-parts)
 4. If handwriting is illegible, set isUnreadable to true and provide best guess in answerText
-5. For each answer, estimate bounding box location as percentages of image dimensions (0-100)
+5. For EACH answer, return a TIGHT boundingBox around ONLY the student's handwritten/typed response
+   - Exclude printed question numbers, sheet headers, and other answers
+   - Box must hug the answer ink/text closely (typical width 15-70%, height 3-15% of page)
+   - Use percentages 0-100 relative to the page in pageNumber: x=left, y=top, width, height
 6. Set confidence: high (clear text), medium (partially clear), low (hard to read)
 7. Include pageNumber (1-based) indicating which page of the answer sheet the answer appears on
 
@@ -268,6 +278,7 @@ export async function extractAnswers(
       ? a.subQuestionLabel.toLowerCase()
       : undefined,
     pageNumber: a.pageNumber && a.pageNumber > 0 ? a.pageNumber : 1,
+    boundingBox: normalizeBoundingBox(a.boundingBox),
   }));
 }
 
@@ -309,39 +320,178 @@ export function mapAnswersToQuestions(
     }
   }
 
-  return mappedAnswers.map((answer, index, all) =>
-    enrichMappedAnswer(answer, index, all)
-  );
+  const enriched = mappedAnswers.map((answer) => enrichMappedAnswer(answer));
+  return enriched;
 }
 
-function enrichMappedAnswer(
-  answer: MappedAnswer,
-  index: number,
-  all: MappedAnswer[]
-): MappedAnswer {
+function enrichMappedAnswer(answer: MappedAnswer): MappedAnswer {
   const enriched = { ...answer };
 
   if (!enriched.pageNumber) {
     enriched.pageNumber = 1;
   }
 
-  if (!enriched.boundingBox && enriched.status !== "unanswered") {
-    const answeredBefore = all
-      .slice(0, index)
-      .filter((item) => item.status !== "unanswered").length;
-    const answeredTotal = all.filter(
-      (item) => item.status !== "unanswered"
-    ).length;
-    const slotHeight = Math.min(72 / Math.max(answeredTotal, 1), 16);
-    enriched.boundingBox = {
-      x: 5,
-      y: 6 + answeredBefore * (slotHeight + 3),
-      width: 90,
-      height: slotHeight,
-    };
+  if (enriched.boundingBox) {
+    enriched.boundingBox = padBoundingBox(
+      clampBoundingBox(enriched.boundingBox),
+      0.3
+    );
   }
 
   return enriched;
+}
+
+function buildRegionLookupKey(
+  questionNumber: string,
+  subQuestionLabel?: string | null
+): string {
+  const sub = subQuestionLabel ? subQuestionLabel.toLowerCase() : "";
+  return `${normalizeQuestionNumber(questionNumber)}:${sub}`;
+}
+
+function buildRefineRegionsPrompt(
+  answers: MappedAnswer[],
+  singleQuestionId?: string
+): string {
+  const targets = answers
+    .filter((answer) => answer.status !== "unanswered" && answer.answerText)
+    .filter((answer) => !singleQuestionId || answer.questionId === singleQuestionId)
+    .map((answer) => ({
+      questionId: answer.questionId,
+      questionNumber: answer.questionNumber,
+      subQuestionLabel: answer.subQuestionLabel ?? null,
+      answerText: answer.answerText,
+      pageNumber: answer.pageNumber ?? 1,
+    }));
+
+  return `You are an expert at locating handwritten answers on exam answer sheets.
+
+Study the document carefully. For each item below, find the EXACT tight region containing ONLY that student's answer ink/text.
+
+CRITICAL coordinate rules:
+- boundingBox uses percentages 0-100 relative to the SPECIFIC PAGE given in pageNumber
+- x = left edge of answer handwriting, y = top edge, width = horizontal span, height = vertical span
+- Box must tightly wrap the answer — NOT the question label, NOT the full line width, NOT neighboring answers
+- Typical answers are small regions (width 15-70%, height 3-15%), not full-page boxes
+- If multi-page PDF, coordinates are per-page (page 1 = first page only)
+
+Return ONLY valid JSON (no markdown):
+{
+  "regions": [
+    {
+      "questionId": "q2",
+      "boundingBox": { "x": 12.5, "y": 34.2, "width": 42.0, "height": 6.5 },
+      "pageNumber": 1
+    }
+  ]
+}
+
+Items to locate:
+${JSON.stringify(targets)}`;
+}
+
+async function applyRefinedRegions(
+  mappedAnswers: MappedAnswer[],
+  mimeType: string,
+  base64Data: string,
+  singleQuestionId?: string
+): Promise<MappedAnswer[]> {
+  const targets = mappedAnswers.filter(
+    (answer) =>
+      answer.status !== "unanswered" &&
+      answer.answerText &&
+      (!singleQuestionId || answer.questionId === singleQuestionId)
+  );
+
+  if (targets.length === 0) return mappedAnswers;
+
+  const prompt = buildRefineRegionsPrompt(mappedAnswers, singleQuestionId);
+  const text = await callGeminiWithFile(mimeType, base64Data, prompt);
+  const parsed = parseJsonResponse<{
+    regions: {
+      questionId?: string;
+      questionNumber?: string;
+      subQuestionLabel?: string | null;
+      boundingBox?: unknown;
+      pageNumber?: number;
+    }[];
+  }>(text);
+
+  const regionMap = new Map<string, { boundingBox: BoundingBox; pageNumber?: number }>();
+
+  for (const region of parsed.regions || []) {
+    const boundingBox = normalizeBoundingBox(region.boundingBox);
+    if (!boundingBox || !isValidBoundingBox(boundingBox)) continue;
+
+    const padded = padBoundingBox(boundingBox, 0.3);
+    const pageNumber =
+      region.pageNumber && region.pageNumber > 0 ? region.pageNumber : 1;
+
+    if (region.questionId) {
+      regionMap.set(region.questionId, { boundingBox: padded, pageNumber });
+      continue;
+    }
+
+    if (region.questionNumber) {
+      const key = buildRegionLookupKey(
+        region.questionNumber,
+        region.subQuestionLabel
+      );
+      regionMap.set(key, { boundingBox: padded, pageNumber });
+    }
+  }
+
+  return mappedAnswers.map((answer) => {
+    const byId = regionMap.get(answer.questionId);
+    const byKey = regionMap.get(
+      buildRegionLookupKey(answer.questionNumber, answer.subQuestionLabel)
+    );
+    const refined = byId || byKey;
+
+    if (!refined) return answer;
+
+    return {
+      ...answer,
+      boundingBox: refined.boundingBox,
+      pageNumber: refined.pageNumber ?? answer.pageNumber ?? 1,
+    };
+  });
+}
+
+export async function refineAnswerBoundingBoxes(
+  mimeType: string,
+  base64Data: string,
+  mappedAnswers: MappedAnswer[]
+): Promise<MappedAnswer[]> {
+  try {
+    return await applyRefinedRegions(mappedAnswers, mimeType, base64Data);
+  } catch {
+    return mappedAnswers;
+  }
+}
+
+export async function refineSingleAnswerRegion(
+  mimeType: string,
+  base64Data: string,
+  mappedAnswers: MappedAnswer[],
+  questionId: string
+): Promise<MappedAnswer | null> {
+  const target = mappedAnswers.find((answer) => answer.questionId === questionId);
+  if (!target || target.status === "unanswered" || !target.answerText) {
+    return null;
+  }
+
+  try {
+    const updated = await applyRefinedRegions(
+      mappedAnswers,
+      mimeType,
+      base64Data,
+      questionId
+    );
+    return updated.find((answer) => answer.questionId === questionId) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function generateAiFeedback(
@@ -438,7 +588,7 @@ function createMappedAnswer(
       answerText: answer.answerText,
       status: "unreadable",
       confidence: answer.confidence,
-      boundingBox: answer.boundingBox,
+      boundingBox: normalizeBoundingBox(answer.boundingBox),
       pageNumber: answer.pageNumber,
     };
   }
@@ -451,7 +601,7 @@ function createMappedAnswer(
     answerText: answer.answerText,
     status: "answered",
     confidence: answer.confidence,
-    boundingBox: answer.boundingBox,
+    boundingBox: normalizeBoundingBox(answer.boundingBox),
     pageNumber: answer.pageNumber,
   };
 }

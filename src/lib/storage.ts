@@ -1,6 +1,12 @@
-import { ExtractionSession } from "./types";
+import { ExtractionSession, MappedAnswer, BoundingBox } from "./types";
 
-const sessions = new Map<string, ExtractionSession>();
+const globalForSessions = globalThis as typeof globalThis & {
+  __vedaSessions?: Map<string, ExtractionSession>;
+};
+
+const sessions =
+  globalForSessions.__vedaSessions ?? new Map<string, ExtractionSession>();
+globalForSessions.__vedaSessions = sessions;
 
 const MAX_SESSIONS = 50;
 const SESSION_TTL_MS = 60 * 60 * 1000;
