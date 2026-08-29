@@ -1,0 +1,334 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  ExtractedAnswer,
+  ExtractedQuestion,
+  MappedAnswer,
+} from "./types";
+
+const QUESTION_EXTRACTION_PROMPT = `You are an expert at reading exam question papers. Analyze the uploaded question paper image/PDF and extract ALL questions in structured JSON format.
+
+Rules:
+1. Extract every question including sub-questions (e.g., Q1(a), Q1(b), Q2, etc.)
+2. Preserve the exact question numbering as shown on the paper
+3. Include the full question text
+4. Identify question type: mcq, short, long, subjective, or other
+5. Include marks if visible
+6. For questions with sub-parts, include subQuestions array with id, label (e.g., "a", "b"), and text
+
+Return ONLY valid JSON in this exact format (no markdown, no code fences):
+{
+  "questions": [
+    {
+      "id": "q1",
+      "number": "1",
+      "text": "Full question text here",
+      "type": "short",
+      "marks": 5,
+      "subQuestions": [
+        { "id": "q1a", "label": "a", "text": "Sub-question text" }
+      ]
+    }
+  ]
+}`;
+
+const ANSWER_EXTRACTION_PROMPT = `You are an expert at reading handwritten and typed answer sheets. Analyze the uploaded answer sheet and extract ALL student answers.
+
+Rules:
+1. Extract answers even if they are out of order on the paper
+2. Match each answer to its question number (e.g., "1", "2", "3a", "3b", "Q4")
+3. Normalize question numbers to match standard format (remove "Q" prefix, use lowercase for sub-parts)
+4. If handwriting is illegible, set isUnreadable to true and provide best guess in answerText
+5. For each answer, estimate bounding box location as percentages of image dimensions (0-100)
+6. Set confidence: high (clear text), medium (partially clear), low (hard to read)
+
+Return ONLY valid JSON in this exact format (no markdown, no code fences):
+{
+  "answers": [
+    {
+      "questionNumber": "1",
+      "subQuestionLabel": null,
+      "answerText": "The student's answer text",
+      "confidence": "high",
+      "boundingBox": { "x": 10, "y": 20, "width": 80, "height": 15 },
+      "isUnreadable": false
+    },
+    {
+      "questionNumber": "2",
+      "subQuestionLabel": "a",
+      "answerText": "Answer for sub-question 2a",
+      "confidence": "medium",
+      "boundingBox": { "x": 10, "y": 40, "width": 80, "height": 10 },
+      "isUnreadable": false
+    }
+  ]
+}`;
+
+function getModelCandidates(): string[] {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  const defaults = [
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+  ];
+  return configured ? [configured, ...defaults.filter((m) => m !== configured)] : defaults;
+}
+
+function isModelNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("404") ||
+    message.includes("not found") ||
+    message.includes("no longer available")
+  );
+}
+
+function formatGeminiError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("API_KEY_INVALID") || message.includes("API key not valid")) {
+    return "Invalid Gemini API key. Get a free key from https://aistudio.google.com/apikey (starts with AIza...).";
+  }
+
+  if (isModelNotFoundError(message)) {
+    return "Gemini model unavailable. Set GEMINI_MODEL in .env.local (try gemini-3.6-flash or gemini-flash-latest).";
+  }
+
+  if (message.includes("429") || message.toLowerCase().includes("quota")) {
+    return "Gemini API rate limit reached. Wait a minute and try again.";
+  }
+
+  return message;
+}
+
+function parseJsonResponse<T>(text: string): T {
+  let cleaned = text.trim();
+  if (cleaned.startsWith("```json")) {
+    cleaned = cleaned.slice(7);
+  } else if (cleaned.startsWith("```")) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.endsWith("```")) {
+    cleaned = cleaned.slice(0, -3);
+  }
+  cleaned = cleaned.trim();
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as T;
+    }
+    throw new Error("Failed to parse AI response as JSON.");
+  }
+}
+
+async function callGeminiWithFile(
+  mimeType: string,
+  base64Data: string,
+  prompt: string
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY is not configured. Add it to your environment variables."
+    );
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const models = getModelCandidates();
+  let lastError: unknown;
+
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+        },
+      });
+
+      const result = await model.generateContent([
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        },
+      ]);
+
+      const response = result.response;
+      const text = response.text();
+      if (!text) {
+        throw new Error(
+          "Gemini returned an empty response. The image may be too low quality."
+        );
+      }
+
+      return text;
+    } catch (error) {
+      lastError = error;
+      if (!isModelNotFoundError(error)) {
+        throw new Error(formatGeminiError(error));
+      }
+    }
+  }
+
+  throw new Error(formatGeminiError(lastError));
+}
+
+export async function extractQuestions(
+  mimeType: string,
+  base64Data: string
+): Promise<ExtractedQuestion[]> {
+  const text = await callGeminiWithFile(
+    mimeType,
+    base64Data,
+    QUESTION_EXTRACTION_PROMPT
+  );
+
+  const parsed = parseJsonResponse<{ questions: ExtractedQuestion[] }>(text);
+  if (!parsed.questions || !Array.isArray(parsed.questions)) {
+    throw new Error("Could not extract questions from the question paper.");
+  }
+
+  return parsed.questions.map((q, i) => ({
+    ...q,
+    id: q.id || `q${i + 1}`,
+    number: String(q.number),
+    type: q.type || "other",
+  }));
+}
+
+export async function extractAnswers(
+  mimeType: string,
+  base64Data: string
+): Promise<ExtractedAnswer[]> {
+  const text = await callGeminiWithFile(
+    mimeType,
+    base64Data,
+    ANSWER_EXTRACTION_PROMPT
+  );
+
+  const parsed = parseJsonResponse<{ answers: ExtractedAnswer[] }>(text);
+  if (!parsed.answers || !Array.isArray(parsed.answers)) {
+    throw new Error("Could not extract answers from the answer sheet.");
+  }
+
+  return parsed.answers.map((a) => ({
+    ...a,
+    questionNumber: normalizeQuestionNumber(a.questionNumber),
+    subQuestionLabel: a.subQuestionLabel
+      ? a.subQuestionLabel.toLowerCase()
+      : undefined,
+  }));
+}
+
+function normalizeQuestionNumber(num: string): string {
+  return num.replace(/^Q\.?\s*/i, "").trim();
+}
+
+function buildAnswerKey(answer: ExtractedAnswer): string {
+  const sub = answer.subQuestionLabel ? answer.subQuestionLabel.toLowerCase() : "";
+  return `${answer.questionNumber}:${sub}`;
+}
+
+export function mapAnswersToQuestions(
+  questions: ExtractedQuestion[],
+  answers: ExtractedAnswer[]
+): MappedAnswer[] {
+  const answerMap = new Map<string, ExtractedAnswer>();
+  for (const answer of answers) {
+    const key = buildAnswerKey(answer);
+    answerMap.set(key, answer);
+  }
+
+  const mapped: MappedAnswer[] = [];
+
+  for (const question of questions) {
+    if (question.subQuestions && question.subQuestions.length > 0) {
+      for (const sub of question.subQuestions) {
+        const key = `${question.number}:${sub.label.toLowerCase()}`;
+        const answer = answerMap.get(key);
+        mapped.push(createMappedAnswer(question, sub.text, sub.label, answer));
+      }
+    } else {
+      const key = `${question.number}:`;
+      const answer =
+        answerMap.get(key) ||
+        answerMap.get(`${question.number}:null`) ||
+        findFuzzyAnswer(answerMap, question.number);
+      mapped.push(createMappedAnswer(question, question.text, undefined, answer));
+    }
+  }
+
+  return mapped;
+}
+
+function findFuzzyAnswer(
+  answerMap: Map<string, ExtractedAnswer>,
+  questionNumber: string
+): ExtractedAnswer | undefined {
+  for (const [key, answer] of answerMap.entries()) {
+    if (key.startsWith(`${questionNumber}:`)) {
+      return answer;
+    }
+  }
+  return undefined;
+}
+
+function createMappedAnswer(
+  question: ExtractedQuestion,
+  displayText: string,
+  subLabel: string | undefined,
+  answer: ExtractedAnswer | undefined
+): MappedAnswer {
+  if (!answer || !answer.answerText?.trim()) {
+    return {
+      questionId: subLabel ? `${question.id}-${subLabel}` : question.id,
+      questionNumber: subLabel ? `${question.number}(${subLabel})` : question.number,
+      questionText: displayText,
+      subQuestionLabel: subLabel,
+      answerText: null,
+      status: "unanswered",
+    };
+  }
+
+  if (answer.isUnreadable) {
+    return {
+      questionId: subLabel ? `${question.id}-${subLabel}` : question.id,
+      questionNumber: subLabel ? `${question.number}(${subLabel})` : question.number,
+      questionText: displayText,
+      subQuestionLabel: subLabel,
+      answerText: answer.answerText,
+      status: "unreadable",
+      confidence: answer.confidence,
+      boundingBox: answer.boundingBox,
+    };
+  }
+
+  return {
+    questionId: subLabel ? `${question.id}-${subLabel}` : question.id,
+    questionNumber: subLabel ? `${question.number}(${subLabel})` : question.number,
+    questionText: displayText,
+    subQuestionLabel: subLabel,
+    answerText: answer.answerText,
+    status: "answered",
+    confidence: answer.confidence,
+    boundingBox: answer.boundingBox,
+  };
+}
+
+export function computeStats(mappedAnswers: MappedAnswer[]) {
+  return {
+    totalQuestions: mappedAnswers.length,
+    answered: mappedAnswers.filter((a) => a.status === "answered").length,
+    unanswered: mappedAnswers.filter((a) => a.status === "unanswered").length,
+    partial: mappedAnswers.filter(
+      (a) => a.status === "partial" || a.status === "unreadable"
+    ).length,
+  };
+}

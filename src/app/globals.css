@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@theme {
+  --color-veda-orange: #ff5623;
+  --color-veda-orange-light: rgba(255, 147, 80, 0.15);
+  --color-veda-orange-gradient-start: #fb975d;
+  --color-veda-orange-gradient-end: #fc5e24;
+  --color-veda-dark: #2b2b2b;
+  --color-veda-text: #303030;
+  --color-veda-text-muted: rgba(94, 94, 94, 0.8);
+  --color-veda-text-muted-light: rgba(94, 94, 94, 0.55);
+  --color-veda-bg-off-white: #f6f6f6;
+  --color-veda-bg-gray: #f0f0f0;
+  --color-veda-disabled: #a9a9a9;
+  --color-veda-success: #34ac15;
+  --color-veda-success-bg: rgba(69, 181, 41, 0.1);
+  --color-veda-warning: #e3600f;
+  --color-veda-warning-bg: rgba(255, 153, 0, 0.1);
+  --color-veda-danger: #c0350a;
+  --color-veda-danger-bg: #ffe9e2;
+  --color-veda-border-dashed: #cecece;
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  body {
+    font-family: inherit;
+    color: var(--color-veda-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    letter-spacing: inherit;
+  }
+}
+
+@layer utilities {
+  .veda-gradient-bg {
+    background: linear-gradient(180deg, #f5f5f5 0%, #e9e5e5 100%);
+  }
+
+  .veda-gradient-bg-alt {
+    background: linear-gradient(180deg, #eeeeee 0%, #dadada 100%);
+  }
+
+  .veda-title-highlight {
+    background: rgba(255, 147, 80, 0.15);
+    border-radius: 8px;
+    padding: 4px 8px;
+    color: #ff5623;
+  }
+
+  .veda-extracting-text {
+    background: linear-gradient(
+      90deg,
+      #303030 20%,
+      #606060 40%,
+      #808080 50%,
+      #606060 60%,
+      #303030 80%
+    );
+  }
+
+  .veda-sidebar-shadow {
+    box-shadow:
+      0px 16px 48px rgba(0, 0, 0, 0.12),
+      0px 32px 48px rgba(0, 0, 0, 0.2);
+  }
+
+  .veda-toolkit-shadow {
+    box-shadow:
+      0px 16px 48px rgba(255, 255, 255, 0.12),
+      0px 32px 48px rgba(255, 255, 255, 0.2),
+      inset 0px -1px 3.5px rgba(177, 177, 177, 0.6),
+      inset 0px 0px 34.5px rgba(255, 255, 255, 0.25);
+  }
+
+  .veda-toolkit-border {
+    background: linear-gradient(
+      180deg,
+      #f8b88a 0%,
+      #ff7a45 45%,
+      #e85a28 100%
+    );
+    padding: 2px;
+    border-radius: 9999px;
+    box-shadow: 0 8px 24px rgba(255, 86, 35, 0.28);
+  }
+
+  .veda-nav-active {
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .upload-dashed {
+    border: 1.5px dashed #cecece;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .upload-dashed:hover,
+  .upload-dashed.drag-over {
+    border-color: #ff5623;
+    background-color: rgba(255, 86, 35, 0.03);
+  }
+
+  @keyframes sparkle-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(0.92);
+    }
+  }
+
+  .animate-sparkle {
+    animation: sparkle-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+
+  .animate-shimmer {
+    background-size: 200% auto;
+    animation: shimmer 2.5s linear infinite;
+  }
+}
