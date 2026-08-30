@@ -39,6 +39,12 @@ Upload a **question paper** and **answer sheet** — Gemini AI extracts question
 
 ---
 
+
+<img width="1917" height="957" alt="image" src="https://github.com/user-attachments/assets/bfe7dee5-e41b-43f5-9395-241324e52cb4" />
+
+<img width="1917" height="960" alt="image" src="https://github.com/user-attachments/assets/83f9697c-674f-4a55-ba64-ea23f04790da" />
+
+
 ## Table of Contents
 
 - [Features](#features)
