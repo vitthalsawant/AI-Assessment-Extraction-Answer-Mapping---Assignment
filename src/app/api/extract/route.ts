@@ -5,8 +5,6 @@ import {
   extractAnswers,
   mapAnswersToQuestions,
   computeStats,
-  generateAiFeedback,
-  refineAnswerBoundingBoxes,
 } from "@/lib/gemini";
 import { saveSession, updateSession } from "@/lib/storage";
 import { validateFile, getMimeType } from "@/lib/validation";
@@ -84,18 +82,12 @@ export async function POST(request: NextRequest) {
       }
 
       const mappedAnswers = mapAnswersToQuestions(questions, answers);
-      const mappedWithRegions = await refineAnswerBoundingBoxes(
-        asMime,
-        asBase64,
-        mappedAnswers
-      );
-      const mappedWithFeedback = await generateAiFeedback(mappedWithRegions);
-      const stats = computeStats(mappedWithFeedback);
+      const stats = computeStats(mappedAnswers);
 
       const completed = updateSession(sessionId, {
         status: "completed",
         questions,
-        mappedAnswers: mappedWithFeedback,
+        mappedAnswers,
         stats,
       });
 
