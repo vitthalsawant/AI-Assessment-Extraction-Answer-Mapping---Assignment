@@ -105,7 +105,7 @@ function formatGeminiError(error: unknown): string {
   }
 
   if (isModelNotFoundError(message)) {
-    return "Gemini model unavailable. Set GEMINI_MODEL in .env.local (try gemini-3.6-flash or gemini-flash-latest).";
+    return "Gemini model unavailable. Set GEMINI_MODEL in .env (try gemini-3.6-flash or gemini-flash-latest).";
   }
 
   if (message.includes("429") || message.toLowerCase().includes("quota")) {

@@ -60,7 +60,11 @@ export default function UploadSection() {
   };
 
   return (
-    <DashboardLayout variant="upload" showBack={isProcessing}>
+    <DashboardLayout
+      variant="upload"
+      showBack={isProcessing}
+      collapsedSidebar={isProcessing}
+    >
       {isProcessing ? (
         <ProcessingOverlay />
       ) : (

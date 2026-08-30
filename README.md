@@ -44,8 +44,8 @@ cd vedaai-assessment-extraction
 npm install
 
 # Configure environment
-Copy-Item .env.example .env.local
-# Edit .env.local and add your GEMINI_API_KEY
+Copy-Item .env.example .env
+# Edit .env and add your GEMINI_API_KEY
 
 # Start development server
 npm run dev

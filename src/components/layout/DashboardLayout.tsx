@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 
@@ -22,6 +22,10 @@ export default function DashboardLayout({
   fullBleed = false,
 }: DashboardLayoutProps) {
   const [collapsed, setCollapsed] = useState(collapsedSidebar);
+
+  useEffect(() => {
+    setCollapsed(collapsedSidebar);
+  }, [collapsedSidebar]);
 
   const isUpload = variant === "upload";
 

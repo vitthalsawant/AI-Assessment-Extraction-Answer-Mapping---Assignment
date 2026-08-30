@@ -63,15 +63,22 @@
     color: #ff5623;
   }
 
-  .veda-extracting-text {
+  .veda-extracting-shimmer {
+    display: inline-block;
+    color: transparent;
     background: linear-gradient(
       90deg,
-      #303030 20%,
-      #606060 40%,
-      #808080 50%,
-      #606060 60%,
-      #303030 80%
+      #303030 0%,
+      #303030 38%,
+      #8a8a8a 50%,
+      #303030 62%,
+      #303030 100%
     );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2.2s linear infinite;
   }
 
   .veda-sidebar-shadow {
@@ -116,33 +123,12 @@
     background-color: rgba(255, 86, 35, 0.03);
   }
 
-  @keyframes sparkle-pulse {
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.7;
-      transform: scale(0.92);
-    }
-  }
-
-  .animate-sparkle {
-    animation: sparkle-pulse 1.5s ease-in-out infinite;
-  }
-
   @keyframes shimmer {
     0% {
-      background-position: -200% center;
+      background-position: 120% center;
     }
     100% {
-      background-position: 200% center;
+      background-position: -120% center;
     }
-  }
-
-  .animate-shimmer {
-    background-size: 200% auto;
-    animation: shimmer 2.5s linear infinite;
   }
 }
