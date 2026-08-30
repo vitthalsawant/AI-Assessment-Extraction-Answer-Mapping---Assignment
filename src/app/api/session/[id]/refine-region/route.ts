@@ -9,7 +9,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = getSession(id);
+    const session = await getSession(id);
 
     if (!session) {
       return NextResponse.json(
@@ -60,7 +60,7 @@ export async function POST(
         : answer
     );
 
-    updateSession(id, { mappedAnswers });
+    await updateSession(id, { mappedAnswers });
 
     return NextResponse.json({
       questionId,

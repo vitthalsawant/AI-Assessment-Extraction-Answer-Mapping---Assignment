@@ -32,6 +32,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# local session files (dev / single-server deploys)
+.data/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import {
-  extractQuestions,
-  extractAnswers,
-  mapAnswersToQuestions,
-  computeStats,
-  generateAiFeedback,
-  refineAnswerBoundingBoxes,
-} from "@/lib/gemini";
-import { saveSession, updateSession } from "@/lib/storage";
+  createProcessingSession,
+  runExtractionPipeline,
+} from "@/lib/extraction";
+import { saveSession } from "@/lib/storage";
 import { validateFile, getMimeType } from "@/lib/validation";
-import { ExtractionSession } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 async function fileToBase64(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -54,69 +50,32 @@ export async function POST(request: NextRequest) {
       fileToBase64(answerSheet),
     ]);
 
-    const session: ExtractionSession = {
-      id: sessionId,
-      createdAt: new Date().toISOString(),
-      status: "processing",
+    const session = createProcessingSession({
+      sessionId,
       questionPaperName: questionPaper.name,
       answerSheetName: answerSheet.name,
-      questionPaperMime: qpMime,
-      answerSheetMime: asMime,
-      questionPaperBase64: qpBase64,
-      answerSheetBase64: asBase64,
-      questions: [],
-      mappedAnswers: [],
-      stats: { totalQuestions: 0, answered: 0, unanswered: 0, partial: 0 },
-    };
+      qpMime,
+      asMime,
+      qpBase64,
+      asBase64,
+    });
 
-    saveSession(session);
+    await saveSession(session);
 
-    try {
-      const [questions, answers] = await Promise.all([
-        extractQuestions(qpMime, qpBase64),
-        extractAnswers(asMime, asBase64),
-      ]);
-
-      if (questions.length === 0) {
-        throw new Error(
-          "No questions found in the question paper. Please upload a clearer image or PDF."
-        );
-      }
-
-      const mappedAnswers = mapAnswersToQuestions(questions, answers);
-      const mappedWithRegions = await refineAnswerBoundingBoxes(
-        asMime,
-        asBase64,
-        mappedAnswers
-      );
-      const mappedWithFeedback = await generateAiFeedback(mappedWithRegions);
-      const stats = computeStats(mappedWithFeedback);
-
-      const completed = updateSession(sessionId, {
-        status: "completed",
-        questions,
-        mappedAnswers: mappedWithFeedback,
-        stats,
-      });
-
-      return NextResponse.json({
+    after(async () => {
+      await runExtractionPipeline(
         sessionId,
-        status: "completed",
-        stats: completed?.stats,
-      });
-    } catch (extractError) {
-      const message =
-        extractError instanceof Error
-          ? extractError.message
-          : "Extraction failed. Please try again with clearer images.";
+        qpMime,
+        qpBase64,
+        asMime,
+        asBase64
+      );
+    });
 
-      updateSession(sessionId, {
-        status: "failed",
-        error: message,
-      });
-
-      return NextResponse.json({ error: message, sessionId }, { status: 422 });
-    }
+    return NextResponse.json({
+      sessionId,
+      status: "processing",
+    });
   } catch (error) {
     console.error("Extract API error:", error);
     const message =

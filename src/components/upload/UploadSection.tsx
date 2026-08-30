@@ -37,6 +37,7 @@ export default function UploadSection() {
 
       const data = await parseApiJson<{
         sessionId?: string;
+        status?: string;
         error?: string;
       }>(response);
 
@@ -45,7 +46,7 @@ export default function UploadSection() {
       }
 
       if (!data.sessionId) {
-        throw new Error("Extraction completed but no session was returned.");
+        throw new Error("Extraction started but no session was returned.");
       }
 
       router.push(`/results/${data.sessionId}`);
