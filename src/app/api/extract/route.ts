@@ -1,11 +1,18 @@
-import { after, NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { runExtraction } from "@/lib/run-extraction";
-import { saveSession } from "@/lib/storage";
+import {
+  extractQuestions,
+  extractAnswers,
+  mapAnswersToQuestions,
+  computeStats,
+  generateAiFeedback,
+  refineAnswerBoundingBoxes,
+} from "@/lib/gemini";
+import { saveSession, updateSession } from "@/lib/storage";
 import { validateFile, getMimeType } from "@/lib/validation";
 import { ExtractionSession } from "@/lib/types";
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 async function fileToBase64(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -62,19 +69,54 @@ export async function POST(request: NextRequest) {
       stats: { totalQuestions: 0, answered: 0, unanswered: 0, partial: 0 },
     };
 
-    await saveSession(session);
+    saveSession(session);
 
-    after(async () => {
-      await runExtraction(sessionId);
-    });
+    try {
+      const [questions, answers] = await Promise.all([
+        extractQuestions(qpMime, qpBase64),
+        extractAnswers(asMime, asBase64),
+      ]);
 
-    return NextResponse.json(
-      {
+      if (questions.length === 0) {
+        throw new Error(
+          "No questions found in the question paper. Please upload a clearer image or PDF."
+        );
+      }
+
+      const mappedAnswers = mapAnswersToQuestions(questions, answers);
+      const mappedWithRegions = await refineAnswerBoundingBoxes(
+        asMime,
+        asBase64,
+        mappedAnswers
+      );
+      const mappedWithFeedback = await generateAiFeedback(mappedWithRegions);
+      const stats = computeStats(mappedWithFeedback);
+
+      const completed = updateSession(sessionId, {
+        status: "completed",
+        questions,
+        mappedAnswers: mappedWithFeedback,
+        stats,
+      });
+
+      return NextResponse.json({
         sessionId,
-        status: "processing",
-      },
-      { status: 202 }
-    );
+        status: "completed",
+        stats: completed?.stats,
+      });
+    } catch (extractError) {
+      const message =
+        extractError instanceof Error
+          ? extractError.message
+          : "Extraction failed. Please try again with clearer images.";
+
+      updateSession(sessionId, {
+        status: "failed",
+        error: message,
+      });
+
+      return NextResponse.json({ error: message, sessionId }, { status: 422 });
+    }
   } catch (error) {
     console.error("Extract API error:", error);
     const message =

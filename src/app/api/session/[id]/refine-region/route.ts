@@ -3,15 +3,13 @@ import { refineSingleAnswerRegion } from "@/lib/gemini";
 import { getSession, updateSession } from "@/lib/storage";
 import { isDisplayableBoundingBox, pickBetterBoundingBox } from "@/lib/bounding-box";
 
-export const maxDuration = 120;
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const session = await getSession(id);
+    const session = getSession(id);
 
     if (!session) {
       return NextResponse.json(
@@ -62,7 +60,7 @@ export async function POST(
         : answer
     );
 
-    await updateSession(id, { mappedAnswers });
+    updateSession(id, { mappedAnswers });
 
     return NextResponse.json({
       questionId,

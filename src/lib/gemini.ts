@@ -80,24 +80,12 @@ Return ONLY valid JSON in this exact format (no markdown, no code fences):
 function getModelCandidates(): string[] {
   const configured = process.env.GEMINI_MODEL?.trim();
   const defaults = [
-    "gemini-2.0-flash",
-    "gemini-2.5-flash",
-    "gemini-flash-latest",
     "gemini-3.6-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
   ];
   return configured ? [configured, ...defaults.filter((m) => m !== configured)] : defaults;
-}
-
-function getExtractionModelCandidates(): string[] {
-  const configured = process.env.GEMINI_MODEL?.trim();
-  const fastDefaults = [
-    "gemini-2.0-flash",
-    "gemini-2.5-flash",
-    "gemini-flash-latest",
-  ];
-  return configured
-    ? [configured, ...fastDefaults.filter((m) => m !== configured)]
-    : fastDefaults;
 }
 
 function isModelNotFoundError(error: unknown): boolean {
@@ -153,8 +141,7 @@ function parseJsonResponse<T>(text: string): T {
 async function callGeminiWithFile(
   mimeType: string,
   base64Data: string,
-  prompt: string,
-  modelCandidates: string[] = getModelCandidates()
+  prompt: string
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -164,7 +151,7 @@ async function callGeminiWithFile(
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const models = modelCandidates;
+  const models = getModelCandidates();
   let lastError: unknown;
 
   for (const modelName of models) {
@@ -173,7 +160,7 @@ async function callGeminiWithFile(
         model: modelName,
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 8192,
         },
       });
 
@@ -253,8 +240,7 @@ export async function extractQuestions(
   const text = await callGeminiWithFile(
     mimeType,
     base64Data,
-    QUESTION_EXTRACTION_PROMPT,
-    getExtractionModelCandidates()
+    QUESTION_EXTRACTION_PROMPT
   );
 
   const parsed = parseJsonResponse<{ questions: ExtractedQuestion[] }>(text);
@@ -277,8 +263,7 @@ export async function extractAnswers(
   const text = await callGeminiWithFile(
     mimeType,
     base64Data,
-    ANSWER_EXTRACTION_PROMPT,
-    getExtractionModelCandidates()
+    ANSWER_EXTRACTION_PROMPT
   );
 
   const parsed = parseJsonResponse<{ answers: ExtractedAnswer[] }>(text);
