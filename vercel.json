@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "src/app/api/extract/route.ts": {
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "src/app/api/session/[id]/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/session/[id]/refine-region/route.ts": {
+      "maxDuration": 120
+    }
+  }
+}

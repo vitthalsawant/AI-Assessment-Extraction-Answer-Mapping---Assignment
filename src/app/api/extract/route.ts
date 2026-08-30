@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import {
-  extractQuestions,
-  extractAnswers,
-  mapAnswersToQuestions,
-  computeStats,
-} from "@/lib/gemini";
-import { saveSession, updateSession } from "@/lib/storage";
+import { runExtraction } from "@/lib/run-extraction";
+import { saveSession } from "@/lib/storage";
 import { validateFile, getMimeType } from "@/lib/validation";
 import { ExtractionSession } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 async function fileToBase64(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -67,48 +62,19 @@ export async function POST(request: NextRequest) {
       stats: { totalQuestions: 0, answered: 0, unanswered: 0, partial: 0 },
     };
 
-    saveSession(session);
+    await saveSession(session);
 
-    try {
-      const [questions, answers] = await Promise.all([
-        extractQuestions(qpMime, qpBase64),
-        extractAnswers(asMime, asBase64),
-      ]);
+    after(async () => {
+      await runExtraction(sessionId);
+    });
 
-      if (questions.length === 0) {
-        throw new Error(
-          "No questions found in the question paper. Please upload a clearer image or PDF."
-        );
-      }
-
-      const mappedAnswers = mapAnswersToQuestions(questions, answers);
-      const stats = computeStats(mappedAnswers);
-
-      const completed = updateSession(sessionId, {
-        status: "completed",
-        questions,
-        mappedAnswers,
-        stats,
-      });
-
-      return NextResponse.json({
+    return NextResponse.json(
+      {
         sessionId,
-        status: "completed",
-        stats: completed?.stats,
-      });
-    } catch (extractError) {
-      const message =
-        extractError instanceof Error
-          ? extractError.message
-          : "Extraction failed. Please try again with clearer images.";
-
-      updateSession(sessionId, {
-        status: "failed",
-        error: message,
-      });
-
-      return NextResponse.json({ error: message, sessionId }, { status: 422 });
-    }
+        status: "processing",
+      },
+      { status: 202 }
+    );
   } catch (error) {
     console.error("Extract API error:", error);
     const message =

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowRight } from "@/components/icons/VedaIcons";
 import { parseApiJson } from "@/lib/api-client";
+import { pollSessionUntilComplete } from "@/lib/poll-session";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import UploadCard from "@/components/upload/UploadCard";
 import ProcessingOverlay from "@/components/upload/ProcessingOverlay";
@@ -37,6 +38,7 @@ export default function UploadSection() {
 
       const data = await parseApiJson<{
         sessionId?: string;
+        status?: string;
         error?: string;
       }>(response);
 
@@ -45,7 +47,18 @@ export default function UploadSection() {
       }
 
       if (!data.sessionId) {
-        throw new Error("Extraction completed but no session was returned.");
+        throw new Error("Extraction started but no session was returned.");
+      }
+
+      if (data.status === "completed") {
+        router.push(`/results/${data.sessionId}`);
+        return;
+      }
+
+      const result = await pollSessionUntilComplete(data.sessionId);
+
+      if (result.status === "failed") {
+        throw new Error(result.error || "Extraction failed. Please try again.");
       }
 
       router.push(`/results/${data.sessionId}`);

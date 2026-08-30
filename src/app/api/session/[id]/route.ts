@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/storage";
 
+export const maxDuration = 60;
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = getSession(id);
+  const session = await getSession(id);
 
   if (!session) {
     return NextResponse.json(

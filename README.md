@@ -563,7 +563,8 @@ Open **http://localhost:3000** in your browser.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `GEMINI_API_KEY` | **Yes** | — | Google Gemini API key |
-| `GEMINI_MODEL` | No | `gemini-3.6-flash` | Model override (falls back to `gemini-flash-latest`) |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash` | Model override (falls back to `gemini-2.5-flash`) |
+| `BLOB_READ_WRITE_TOKEN` | **Yes on Vercel** | — | Vercel Blob token for session storage across serverless instances |
 
 > **Never commit `.env` or `.env.local`** — they are excluded via `.gitignore`.
 
@@ -575,9 +576,12 @@ Open **http://localhost:3000** in your browser.
 
 1. Push code to GitHub
 2. Import the repo in [Vercel](https://vercel.com)
-3. Add `GEMINI_API_KEY` under **Environment Variables**
-4. Deploy — Vercel auto-detects Next.js
-5. Update the Live Demo link at the top of this README
+3. Add environment variables under **Settings → Environment Variables**:
+   - `GEMINI_API_KEY`
+   - `GEMINI_MODEL` (optional, e.g. `gemini-2.0-flash`)
+4. Create a **Blob store** in the Vercel project (**Storage → Blob → Create**). This auto-adds `BLOB_READ_WRITE_TOKEN` — required so extraction sessions persist across serverless instances.
+5. Deploy — extraction runs in the background (up to 5 minutes client wait, 300s server limit on Pro)
+6. Update the Live Demo link at the top of this README
 
 ```powershell
 # Optional: deploy via Vercel CLI
