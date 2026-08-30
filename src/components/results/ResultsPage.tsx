@@ -18,14 +18,6 @@ import {
 import { ExtractionSession, MappedAnswer } from "@/lib/types";
 import { IconAlertTriangle, IconArrowLeft } from "@/components/icons/VedaIcons";
 import Link from "next/link";
-import {
-  PROCESSING_MAX_WAIT_MS,
-  SESSION_POLL_INTERVAL_MS,
-} from "@/lib/session-config";
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export default function ResultsPage() {
   const params = useParams();
@@ -40,78 +32,34 @@ export default function ResultsPage() {
   const refinedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!sessionId) return;
-
-    let cancelled = false;
-    const startedAt = Date.now();
-
     async function fetchSession() {
-      setLoading(true);
-      setError(null);
+      try {
+        const res = await fetch(`/api/session/${sessionId}`, {
+          cache: "no-store",
+        });
+        const data = await parseApiJson<ExtractionSession & { error?: string }>(
+          res
+        );
 
-      while (!cancelled) {
-        try {
-          const res = await fetch(`/api/session/${sessionId}`, {
-            cache: "no-store",
-          });
-          const data = await parseApiJson<
-            ExtractionSession & { error?: string }
-          >(res);
-
-          if (res.status === 404) {
-            if (Date.now() - startedAt < 10_000) {
-              await sleep(SESSION_POLL_INTERVAL_MS);
-              continue;
-            }
-            throw new Error(
-              data.error || "Session not found or expired. Please upload files again."
-            );
-          }
-
-          if (!res.ok && data.status !== "processing") {
-            throw new Error(data.error || "Failed to load results.");
-          }
-
-          if (data.status === "processing") {
-            if (Date.now() - startedAt >= PROCESSING_MAX_WAIT_MS) {
-              throw new Error(
-                "Extraction is taking longer than expected (over 20 minutes). Please try again."
-              );
-            }
-            await sleep(SESSION_POLL_INTERVAL_MS);
-            continue;
-          }
-
-          if (data.status === "failed") {
-            throw new Error(data.error || "Extraction failed. Please try again.");
-          }
-
-          setSession(data);
-          setMappedAnswers(data.mappedAnswers || []);
-          if (data.mappedAnswers?.length > 0) {
-            setSelectedId(data.mappedAnswers[0].questionId);
-          }
-          break;
-        } catch (err) {
-          if (!cancelled) {
-            setError(
-              err instanceof Error ? err.message : "Failed to load results."
-            );
-          }
-          break;
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load results.");
         }
-      }
 
-      if (!cancelled) {
+        setSession(data);
+        setMappedAnswers(data.mappedAnswers || []);
+        if (data.mappedAnswers?.length > 0) {
+          setSelectedId(data.mappedAnswers[0].questionId);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load results."
+        );
+      } finally {
         setLoading(false);
       }
     }
 
-    fetchSession();
-
-    return () => {
-      cancelled = true;
-    };
+    if (sessionId) fetchSession();
   }, [sessionId]);
 
   useEffect(() => {
