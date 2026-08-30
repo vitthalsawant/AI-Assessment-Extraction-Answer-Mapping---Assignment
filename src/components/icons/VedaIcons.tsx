@@ -104,6 +104,16 @@ export function IconPanelClose({ size = 20, ...props }: IconProps) {
   );
 }
 
+export function IconMenu({ size = 20, ...props }: IconProps) {
+  return (
+    <IconBase size={size} {...props}>
+      <path d="M4 6H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M4 10H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M4 14H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </IconBase>
+  );
+}
+
 export function IconChevronsRight({ size = 20, ...props }: IconProps) {
   return (
     <IconBase size={size} {...props}>
@@ -132,8 +142,28 @@ export function IconToolkitSparkles({ size = 18, ...props }: IconProps) {
 
 export function IconArrowLeft({ size = 24, ...props }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...props}>
-      <path d="M14.5 6.5L9 12L14.5 17.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      {...props}
+    >
+      <path
+        d="M19 12H5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 19L5 12L12 5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -187,11 +217,46 @@ export function IconChevronDown({ size = 24, ...props }: IconProps) {
 
 export function IconUpload({ size = 32, ...props }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...props}>
-      <path d="M16 7V19" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-      <path d="M11.5 11.5L16 7L20.5 11.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8 22H24" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-      <path d="M10 25H22" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      {...props}
+    >
+      <path
+        d="M16 8V18.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12.5 12.5L16 9L19.5 12.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.5 22.5H21.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10.5 22.5V19.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M21.5 22.5V19.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

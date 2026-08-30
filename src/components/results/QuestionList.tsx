@@ -38,7 +38,7 @@ function ScorePill({ text, variant }: { text: string; variant: "success" | "dang
   };
   return (
     <span
-      className={`rounded-full px-3 py-1 text-base font-bold tracking-[-0.04em] ${styles[variant]}`}
+      className={`rounded-full px-2 py-0.5 text-xs font-bold tracking-[-0.04em] sm:px-3 sm:py-1 sm:text-base ${styles[variant]}`}
     >
       {text}
     </span>
@@ -94,15 +94,15 @@ export default function QuestionList({
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-[20px] bg-white/50 p-4">
-      <div className="flex shrink-0 items-center justify-between">
-        <h2 className="text-base font-bold tracking-[-0.04em] text-veda-text">
+    <div className="flex h-full w-full flex-col gap-3 rounded-[20px] bg-white/50 p-3 lg:gap-4 lg:p-4">
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <h2 className="text-sm font-bold leading-5 tracking-[-0.04em] text-veda-text lg:text-base">
           Extracted Questions (from question paper)
         </h2>
         <button
           type="button"
           onClick={expandAll}
-          className="rounded-full bg-white px-4 py-3 text-sm font-medium tracking-[-0.04em] text-[#181818] transition-colors hover:bg-veda-bg-off-white"
+          className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-medium tracking-[-0.04em] text-[#181818] transition-colors hover:bg-veda-bg-off-white sm:px-4 sm:py-3 sm:text-sm"
         >
           Expand All
         </button>
@@ -134,16 +134,16 @@ export default function QuestionList({
                     handleSelect(answer.questionId);
                   }
                 }}
-                className={`w-full cursor-pointer rounded-2xl bg-white p-3 text-left transition-all ${
+                className={`w-full cursor-pointer rounded-2xl bg-white p-2.5 text-left transition-all sm:p-3 ${
                   isSelected
                     ? "border-2 border-[#FF8D36]"
                     : "border-2 border-transparent"
                 }`}
               >
-                <div className="flex items-start gap-4">
-                  <div className="flex shrink-0 items-center gap-2">
+                <div className="flex items-start gap-2 sm:gap-4">
+                  <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                     <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/25 text-xl font-extrabold tracking-[-0.04em] text-white shadow-sm ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/25 text-base font-extrabold tracking-[-0.04em] text-white shadow-sm sm:h-8 sm:w-8 sm:text-xl ${
                         isSelected ? "bg-veda-orange" : "bg-[rgba(43,43,43,0.8)]"
                       }`}
                     >
@@ -156,11 +156,11 @@ export default function QuestionList({
                     )}
                   </div>
 
-                  <p className="flex-1 text-base leading-[22px] tracking-[-0.04em] text-veda-text">
+                  <p className="flex-1 text-sm leading-5 tracking-[-0.04em] text-veda-text sm:text-base sm:leading-[22px]">
                     {answer.questionText}
                   </p>
 
-                  <div className="flex shrink-0 items-center gap-4">
+                  <div className="flex shrink-0 items-center gap-2 sm:gap-4">
                     <ScorePill text={score.text} variant={score.variant} />
                     <button
                       type="button"

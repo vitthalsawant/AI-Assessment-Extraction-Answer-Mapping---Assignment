@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IconClose, IconUpload } from "@/components/icons/VedaIcons";
+import { IconClose } from "@/components/icons/VedaIcons";
 import {
   validateFile,
   formatFileSizeCompact,
@@ -102,7 +103,7 @@ export default function UploadCard({
   return (
     <div className="flex-1 min-w-0">
       <div
-        className={`upload-dashed rounded-[20px] bg-white flex items-center justify-center min-h-[168px] relative ${
+        className={`upload-dashed relative flex min-h-[120px] items-center justify-center rounded-[20px] bg-white sm:min-h-[168px] ${
           file ? "cursor-default" : "cursor-pointer"
         } ${dragOver && !file ? "drag-over" : ""}`}
         onDragOver={(e) => {
@@ -122,9 +123,9 @@ export default function UploadCard({
         />
 
         {file ? (
-          <div className="w-full px-6 py-5 flex items-center justify-center">
-            <div className="relative w-full max-w-[300px]">
-              <div className="flex items-center gap-3 bg-veda-bg-off-white rounded-xl px-4 py-3.5 pr-10">
+          <div className="flex w-full items-center justify-center px-4 py-4 sm:px-6 sm:py-5">
+            <div className="relative w-full">
+              <div className="flex items-center gap-3 rounded-xl bg-veda-bg-off-white px-4 py-3.5 pr-10">
                 {isPdf ? <PdfFileIcon /> : <ImageFileIcon />}
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-base leading-tight tracking-[-0.04em] text-veda-dark truncate">
@@ -152,10 +153,15 @@ export default function UploadCard({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 py-4">
-            <div className="w-11 h-11 flex items-center justify-center bg-veda-bg-off-white rounded-lg">
-              <IconUpload size={28} className="text-veda-text" />
-            </div>
+          <div className="flex flex-col items-center gap-[10px] py-4">
+            <Image
+              src="/images/upload-icon.png"
+              alt=""
+              width={48}
+              height={48}
+              className="h-12 w-12 shrink-0 rounded-lg"
+              aria-hidden="true"
+            />
             <div className="text-center">
               <p className="text-lg font-semibold tracking-[-0.06em]">
                 <span className="text-veda-dark">Upload </span>

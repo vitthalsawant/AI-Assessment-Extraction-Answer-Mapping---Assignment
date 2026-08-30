@@ -112,13 +112,13 @@ export default function AnswerSheetViewer({
   const totalPages = isPdf ? pdfPages : 1;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-black/10 bg-white">
-      <div className="flex shrink-0 items-center justify-between border-b border-black/10 bg-veda-text px-6 py-3">
-        <h2 className="text-base font-bold tracking-[-0.04em] text-white/80">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-[20px] border border-black/10 bg-white">
+      <div className="flex shrink-0 items-center justify-between border-b border-black/10 bg-veda-text px-3 py-2.5 lg:px-6 lg:py-3">
+        <h2 className="hidden text-base font-bold tracking-[-0.04em] text-white/80 lg:block">
           Answer Sheet
         </h2>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full items-center justify-between gap-2 lg:w-auto lg:justify-end lg:gap-3">
           <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
             <button
               type="button"

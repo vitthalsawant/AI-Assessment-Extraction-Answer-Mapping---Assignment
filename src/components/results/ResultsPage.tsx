@@ -5,7 +5,11 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import QuestionList from "@/components/results/QuestionList";
 import AnswerSheetViewer from "@/components/results/AnswerSheetViewer";
+import ResultsMobileTabs, {
+  ResultsTab,
+} from "@/components/results/ResultsMobileTabs";
 import ProcessingOverlay from "@/components/upload/ProcessingOverlay";
+import { parseApiJson } from "@/lib/api-client";
 import {
   estimateAnswerBoundingBox,
   isDisplayableBoundingBox,
@@ -24,13 +28,18 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refiningId, setRefiningId] = useState<string | null>(null);
+  const [mobileTab, setMobileTab] = useState<ResultsTab>("questions");
   const refinedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchSession() {
       try {
-        const res = await fetch(`/api/session/${sessionId}`);
-        const data = await res.json();
+        const res = await fetch(`/api/session/${sessionId}`, {
+          cache: "no-store",
+        });
+        const data = await parseApiJson<ExtractionSession & { error?: string }>(
+          res
+        );
 
         if (!res.ok) {
           throw new Error(data.error || "Failed to load results.");
@@ -177,6 +186,11 @@ export default function ResultsPage() {
     refiningId === selectedId &&
     !isDisplayableBoundingBox(selectedAnswer?.boundingBox);
 
+  const handleSelectQuestion = (id: string) => {
+    setSelectedId(id);
+    setMobileTab("sheet");
+  };
+
   return (
     <DashboardLayout
       variant="default"
@@ -185,20 +199,34 @@ export default function ResultsPage() {
       backHref="/"
       fullBleed
     >
-      <div className="flex h-full flex-col p-3">
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-2">
-          <QuestionList
-            answers={mappedAnswers}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
-          <AnswerSheetViewer
-            imageSrc={imageSrc}
-            mimeType={session.answerSheetMime}
-            answers={mappedAnswers}
-            selectedId={selectedId}
-            isRefining={isRefiningSelected}
-          />
+      <div className="flex h-full flex-col gap-2 px-3 pb-3 pt-1 lg:gap-3 lg:p-3">
+        <ResultsMobileTabs activeTab={mobileTab} onChange={setMobileTab} />
+
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:gap-3 xl:grid-cols-2">
+          <div
+            className={`min-h-0 ${
+              mobileTab === "questions" ? "flex" : "hidden"
+            } xl:flex`}
+          >
+            <QuestionList
+              answers={mappedAnswers}
+              selectedId={selectedId}
+              onSelect={handleSelectQuestion}
+            />
+          </div>
+          <div
+            className={`min-h-0 ${
+              mobileTab === "sheet" ? "flex" : "hidden"
+            } xl:flex`}
+          >
+            <AnswerSheetViewer
+              imageSrc={imageSrc}
+              mimeType={session.answerSheetMime}
+              answers={mappedAnswers}
+              selectedId={selectedId}
+              isRefining={isRefiningSelected}
+            />
+          </div>
         </div>
       </div>
     </DashboardLayout>

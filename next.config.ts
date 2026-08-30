@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "12mb",
     },
   },
+  serverExternalPackages: ["@google/generative-ai"],
 };
 
 export default nextConfig;
