@@ -36,6 +36,9 @@ export default function DashboardLayout({
           ? "veda-gradient-bg p-0 lg:p-3"
           : "veda-gradient-bg-alt p-0 lg:p-3"
       }`}
+      style={{
+        paddingBottom: "max(env(safe-area-inset-bottom), 0px)",
+      }}
     >
       <div className="flex min-h-0 flex-1 gap-3">
         <Sidebar

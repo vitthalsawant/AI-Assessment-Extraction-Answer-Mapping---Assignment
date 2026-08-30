@@ -12,7 +12,7 @@ export default function ResultsMobileTabs({
   onChange,
 }: ResultsMobileTabsProps) {
   return (
-    <div className="shrink-0 xl:hidden">
+    <div className="shrink-0 lg:hidden">
       <div className="relative flex h-11 w-full rounded-full bg-white p-1 shadow-[0px_2px_12px_rgba(0,0,0,0.08)]">
         <div
           aria-hidden="true"

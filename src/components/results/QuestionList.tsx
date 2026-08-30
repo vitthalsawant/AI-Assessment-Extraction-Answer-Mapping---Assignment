@@ -96,7 +96,7 @@ export default function QuestionList({
   return (
     <div className="flex h-full w-full flex-col gap-3 rounded-[20px] bg-white/50 p-3 lg:gap-4 lg:p-4">
       <div className="flex shrink-0 items-center justify-between gap-2">
-        <h2 className="text-sm font-bold leading-5 tracking-[-0.04em] text-veda-text lg:text-base">
+        <h2 className="min-w-0 text-xs font-bold leading-5 tracking-[-0.04em] text-veda-text sm:text-sm lg:text-base">
           Extracted Questions (from question paper)
         </h2>
         <button
@@ -180,8 +180,8 @@ export default function QuestionList({
               </div>
 
               {showFeedback && (
-                <div className="mx-1 mt-2 rounded-2xl bg-veda-bg-off-white px-6 py-4">
-                  <p className="mb-2.5 text-base font-bold tracking-[-0.04em] text-veda-text">
+                <div className="mx-1 mt-2 rounded-2xl bg-veda-bg-off-white px-4 py-3 sm:px-6 sm:py-4">
+                  <p className="mb-2 text-sm font-bold tracking-[-0.04em] text-veda-text sm:mb-2.5 sm:text-base">
                     AI Feedback
                   </p>
                   <p className="text-sm leading-5 tracking-[-0.04em] text-veda-text">

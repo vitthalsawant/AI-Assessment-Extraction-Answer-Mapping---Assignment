@@ -16,7 +16,9 @@ export default function PdfSheetCanvas({
   onDocumentLoad,
   onRender,
 }: PdfSheetCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const onDocumentLoadRef = useRef(onDocumentLoad);
   const onRenderRef = useRef(onRender);
@@ -29,9 +31,25 @@ export default function PdfSheetCanvas({
   }, []);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      setContainerWidth(container.clientWidth);
+    };
+
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || containerWidth <= 0) return;
 
     async function renderPage() {
       try {
@@ -45,7 +63,10 @@ export default function PdfSheetCanvas({
         const pdfPage = await pdf.getPage(pageIndex);
         if (cancelled || !canvas) return;
 
-        const viewport = pdfPage.getViewport({ scale: 1.5 });
+        const baseViewport = pdfPage.getViewport({ scale: 1 });
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const scale = (containerWidth / baseViewport.width) * pixelRatio;
+        const viewport = pdfPage.getViewport({ scale });
         const context = canvas.getContext("2d");
         if (!context) return;
 
@@ -75,18 +96,18 @@ export default function PdfSheetCanvas({
     return () => {
       cancelled = true;
     };
-  }, [src, page]);
+  }, [src, page, containerWidth]);
 
   if (error) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center rounded-xl bg-white p-6 text-sm text-veda-text-muted">
+      <div className="flex min-h-[160px] items-center justify-center rounded-xl bg-white p-4 text-sm text-veda-text-muted sm:min-h-[200px] sm:p-6">
         {error}
       </div>
     );
   }
 
   return (
-    <div className="relative w-full bg-white">
+    <div ref={containerRef} className="relative w-full bg-white">
       <canvas ref={canvasRef} className="block w-full" />
     </div>
   );

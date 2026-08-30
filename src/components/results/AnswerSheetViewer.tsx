@@ -113,13 +113,13 @@ export default function AnswerSheetViewer({
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-[20px] border border-black/10 bg-white">
-      <div className="flex shrink-0 items-center justify-between border-b border-black/10 bg-veda-text px-3 py-2.5 lg:px-6 lg:py-3">
-        <h2 className="hidden text-base font-bold tracking-[-0.04em] text-white/80 lg:block">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-black/10 bg-veda-text px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between lg:px-6 lg:py-3">
+        <h2 className="hidden text-sm font-bold tracking-[-0.04em] text-white/80 sm:text-base lg:block">
           Answer Sheet
         </h2>
 
-        <div className="flex w-full items-center justify-between gap-2 lg:w-auto lg:justify-end lg:gap-3">
-          <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
+        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-3">
+          <div className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
             <button
               type="button"
               onClick={handleZoomOut}
@@ -128,7 +128,7 @@ export default function AnswerSheetViewer({
             >
               <IconMinus size={16} className="text-white" />
             </button>
-            <span className="w-10 text-center text-sm font-bold tracking-[-0.04em] text-white">
+            <span className="w-9 text-center text-xs font-bold tracking-[-0.04em] text-white sm:w-10 sm:text-sm">
               {zoom}%
             </span>
             <button
@@ -142,7 +142,7 @@ export default function AnswerSheetViewer({
           </div>
 
           {isPdf && totalPages > 1 && (
-            <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
+            <div className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
               <button
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
@@ -152,8 +152,13 @@ export default function AnswerSheetViewer({
               >
                 <IconChevronLeft size={16} className="text-white/60" />
               </button>
-              <span className="text-sm font-bold tracking-[-0.04em] text-white">
-                Page {activePage} of {totalPages}
+              <span className="whitespace-nowrap text-xs font-bold tracking-[-0.04em] text-white sm:text-sm">
+                <span className="sm:hidden">
+                  {activePage}/{totalPages}
+                </span>
+                <span className="hidden sm:inline">
+                  Page {activePage} of {totalPages}
+                </span>
               </span>
               <button
                 type="button"
@@ -176,7 +181,7 @@ export default function AnswerSheetViewer({
         className="relative min-h-0 flex-1 overflow-auto bg-[#f8f8f8] scroll-smooth"
       >
         <div
-          className="mx-auto p-4 transition-[width] duration-200"
+          className="mx-auto w-full p-2 transition-[width] duration-200 sm:p-4"
           style={{ width: `${zoom}%` }}
         >
           <div className="relative">

@@ -41,8 +41,8 @@ export default function Header({
 
   return (
     <>
-      <div className="shrink-0 px-4 pt-3 lg:hidden">
-        <header className="mx-auto flex h-14 w-full max-w-[373px] items-center justify-between rounded-2xl bg-white pl-3 pr-4 shadow-[0px_2px_12px_rgba(0,0,0,0.06)]">
+      <div className="shrink-0 px-3 pt-3 sm:px-4 lg:hidden">
+        <header className="flex h-14 w-full items-center justify-between rounded-2xl bg-white pl-3 pr-3 shadow-[0px_2px_12px_rgba(0,0,0,0.06)] sm:pl-4 sm:pr-4">
           <div className="flex min-w-0 items-center gap-2">
             {showMobileBack && (
               <Link

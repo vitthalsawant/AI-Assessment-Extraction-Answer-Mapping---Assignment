@@ -188,7 +188,9 @@ export default function ResultsPage() {
 
   const handleSelectQuestion = (id: string) => {
     setSelectedId(id);
-    setMobileTab("sheet");
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setMobileTab("sheet");
+    }
   };
 
   return (
@@ -202,11 +204,11 @@ export default function ResultsPage() {
       <div className="flex h-full flex-col gap-2 px-3 pb-3 pt-1 lg:gap-3 lg:p-3">
         <ResultsMobileTabs activeTab={mobileTab} onChange={setMobileTab} />
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:gap-3 xl:grid-cols-2">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-2 lg:gap-3">
           <div
             className={`min-h-0 ${
               mobileTab === "questions" ? "flex" : "hidden"
-            } xl:flex`}
+            } lg:flex`}
           >
             <QuestionList
               answers={mappedAnswers}
@@ -217,7 +219,7 @@ export default function ResultsPage() {
           <div
             className={`min-h-0 ${
               mobileTab === "sheet" ? "flex" : "hidden"
-            } xl:flex`}
+            } lg:flex`}
           >
             <AnswerSheetViewer
               imageSrc={imageSrc}
